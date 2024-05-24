@@ -1,0 +1,59 @@
+pipeline {
+    agent any
+    
+    environment {
+        MAVEN_HOME = tool 'Maven' // Maven installation defined in Jenkins configuration
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh "${env.MAVEN_HOME}/bin/mvn clean package -DskipTests" // Build the project with Maven
+            }
+        }
+        
+        stage('Static Code Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQubeServer') {
+                    sh "${env.MAVEN_HOME}/bin/mvn sonar:sonar" // Run SonarQube analysis
+                }
+            }
+        }
+        
+        stage('Unit Tests') {
+            steps {
+                sh "${env.MAVEN_HOME}/bin/mvn test" // Run unit tests
+            }
+        }
+        
+        stage('Integration Tests') {
+            steps {
+                // Run Selenium tests (assuming test scripts are in the 'test' directory)
+                sh "${env.MAVEN_HOME}/bin/mvn -Dtest=TestSuiteIT test"
+            }
+        }
+        
+        stage('Deploy to Nexus') {
+            steps {
+                nexusArtifactUploader([
+                    nexusVersion: 'nexus3',
+                    protocol: 'http',
+                    nexusUrl: 'NEXUS_URL', // Replace with Nexus URL
+                    groupId: 'com.example',
+                    version: '1.0-SNAPSHOT',
+                    repository: 'maven-snapshots',
+                    credentialsId: 'NEXUS_CREDENTIALS_ID', // Configure Nexus credentials in Jenkins
+                    artifacts: [
+                        [artifactId: 'your-artifact-id', file: 'target/your-artifact-id-1.0-SNAPSHOT.jar', type: 'jar']
+                    ]
+                ])
+            }
+        }
+    }
+}
